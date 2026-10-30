@@ -5,10 +5,15 @@
 #include "Mundo.h"
 #include "glut.h"
 
+#include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
@@ -17,10 +22,16 @@
 CMundo::CMundo()
 {
 	Init();
+	fd_logger = -1;
+	puntos1=0;
+	puntos2=0;
+	
 }
 
 CMundo::~CMundo()
 {
+if (fd_logger >= 0)
+    close(fd_logger);
 
 }
 
@@ -34,6 +45,10 @@ void CMundo::InitGL()
 	
 	glMatrixMode(GL_PROJECTION);
 	gluPerspective( 40.0, 800/600.0f, 0.1, 150);
+	
+	fd_logger = open("/tmp/loggerfifo", O_WRONLY);
+if (fd_logger < 0)
+    perror("No se pudo abrir la tuberia (esta el logger en ejecucion?)");
 }
 
 void print(char *mensaje, int x, int y, float r, float g, float b)
@@ -135,6 +150,12 @@ void CMundo::OnTimer(int value)
 		esfera.velocidad.x=2+2*rand()/(float)RAND_MAX;
 		esfera.velocidad.y=2+2*rand()/(float)RAND_MAX;
 		puntos2++;
+		if (fd_logger >= 0) {
+    char cad[100];
+    snprintf(cad, sizeof(cad),
+             "Jugador 2 marca 1 punto, lleva un total de %d puntos.\n", puntos2);
+    write(fd_logger, cad, strlen(cad));
+}
 	}
 
 	if(fondo_dcho.Rebota(esfera))
@@ -144,8 +165,25 @@ void CMundo::OnTimer(int value)
 		esfera.velocidad.x=-2-2*rand()/(float)RAND_MAX;
 		esfera.velocidad.y=-2-2*rand()/(float)RAND_MAX;
 		puntos1++;
+		if (fd_logger >= 0) {
+    char cad[100];
+    snprintf(cad, sizeof(cad),
+             "Jugador 1 marca 1 punto, lleva un total de %d puntos.\n", puntos1);
+    write(fd_logger, cad, strlen(cad));
+    
+}
+
+if(puntos1>=3 || puntos2>=3)
+{
+char mensaje_fin[256];
+sprintf(mensaje_fin, "Fin de la partida");
+write(fd_logger, mensaje_fin, strlen(mensaje_fin));
+close(fd_logger);
+exit(0);
+
 	}
 
+}
 }
 
 void CMundo::OnKeyboardDown(unsigned char key, int x, int y)
