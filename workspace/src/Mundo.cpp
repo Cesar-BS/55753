@@ -14,7 +14,7 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-
+#include <sys/mman.h>
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
 //////////////////////////////////////////////////////////////////////
@@ -130,6 +130,16 @@ void CMundo::OnDraw()
 
 void CMundo::OnTimer(int value)
 {	
+	// Pasar datos al bot y aplicar su accion
+	pMemC->esfera = esfera;
+	pMemC->raqueta1 = jugador1;
+	if (pMemC->accion == 1)
+		OnKeyboardDown('w', 0, 0);
+	else if (pMemC->accion == -1)
+		OnKeyboardDown('s', 0, 0);
+	else
+		jugador1.velocidad.y = 0;
+		
 	jugador1.Mueve(0.025f);
 	jugador2.Mueve(0.025f);
 	esfera.Mueve(0.025f);
@@ -230,4 +240,20 @@ void CMundo::Init()
 	jugador2.g=0;
 	jugador2.x1=6;jugador2.y1=-1;
 	jugador2.x2=6;jugador2.y2=1;
+	// Fichero proyectado en memoria para comunicar con el bot
+	int fdmem = open("/tmp/datosBot.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
+	if (fdmem < 0) {
+		perror("No puede crearse el fichero de memoria compartida");
+		exit(1);
+	}
+	ftruncate(fdmem, sizeof(DatosMemCompartida));
+	pMemC = (DatosMemCompartida *) mmap(NULL, sizeof(DatosMemCompartida),
+	                                    PROT_READ | PROT_WRITE, MAP_SHARED, fdmem, 0);
+	close(fdmem);
+	if (pMemC == MAP_FAILED) {
+		perror("Error en la proyeccion del fichero");
+		exit(1);
+	}
+	pMemC->accion = 0;
 }
+
